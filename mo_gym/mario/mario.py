@@ -5,23 +5,35 @@ from gym.wrappers import (FrameStack, GrayScaleObservation, ResizeObservation, T
 from gym.utils import seeding
 from nes_py.wrappers import JoypadSpace
 from gym_super_mario_bros.actions import SIMPLE_MOVEMENT
+from gym_super_mario_bros.actions import COMPLEX_MOVEMENT
 from gym_super_mario_bros import SuperMarioBrosEnv
 import gym_super_mario_bros
 #import matplotlib.pyplot as plt
+import random
+import numpy as np
+from collections import deque
+from keras.models import Sequential
+from keras.layers import Dense
+from keras.optimizers import Adam, RMSprop, SGD
+import os
 
 import mo_gym
 
 
 class MOSuperMarioBros(SuperMarioBrosEnv):
     
-    def __init__(self, rom_mode='pixel', lost_levels=False, target=None, objectives=['x_pos', 'time', 'death', 'coin', 'enemy']):
+    def __init__(self, rom_mode='pixel', lost_levels=False, target=None, objectives=['x_pos',  'coin']):
         super().__init__(rom_mode, lost_levels, target)
-
+        
+        self.epsilon = 0.99
+        self.epsilonDecrease = 0.99
         self.objectives = set(objectives)
         self.reward_space = gym.spaces.Box(high=np.inf, low=-np.inf, shape=(len(objectives),))
 
         self.single_stage = True
         self.done_when_dead = True
+
+        self.model = self._build_model()
 
     def reset(self, seed=None, return_info=False, **kwargs):
         self._np_random, seed = seeding.np_random(seed) # this is not used
@@ -99,11 +111,25 @@ class MOSuperMarioBros(SuperMarioBrosEnv):
 
         return obs, mor, bool(done), info
 
+    def get_action(self, ob):
+        if np.random.rand() <= self.epsilon:
+            return self.action_space.sample()
+        ob = self._reshape_ob(ob)
+        act_values = self.model.predict(ob)
+        return np.argmax(ob)
+        
+    
+
+
+
+
 
 if __name__ == '__main__':
 
+    nonDominated = []
+    averageReward = 0
     env = MOSuperMarioBros()
-    env = JoypadSpace(env, SIMPLE_MOVEMENT)
+    env = JoypadSpace(env, COMPLEX_MOVEMENT)
     #env = MaxAndSkipEnv(env, 4)
     env = ResizeObservation(env, (84, 84))
     env = GrayScaleObservation(env)
@@ -111,10 +137,27 @@ if __name__ == '__main__':
     env = mo_gym.LinearReward(env)
 
     done = False
-    env.reset()
+    obs = env.reset()
     while True:
-        obs, r, done, info = env.step(env.action_space.sample())
+        #precisamos fazer uma get_action
+        action = env.get_action(obs)
+        obs, r, done, info = env.step(action)
+
         print(r, info['vector_reward'], done, info['time'])
+
+        #############################################
+        #enquanto estado não for terminal
+        #Choose action a from s using a policy derived from the Qset
+
+        #Take action a and observe state s' and reward vector
+
+        #atualiza ND
+        #atualiza R
+        #passa pro proxinmo estado
+        #############################################
+
+
+
         """ plt.figure()
         plt.imshow(obs, cmap='gray', vmin=0, vmax=255)
         plt.show() """
