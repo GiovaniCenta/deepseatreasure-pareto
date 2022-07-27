@@ -54,7 +54,7 @@ class DeepSeaTreasure(gym.Env):
         self.window = None
         self.clock = None
         self.epsilon = 0.99
-        self.epsilonDecrease = 0.99
+        self.epsilonDecrease = 0.9
 
         self.float_state = float_state
 
@@ -205,10 +205,10 @@ class DeepSeaTreasure(gym.Env):
         
         reward1 = 0
         reward2 = 0
-        
-        Q1 = np.zeros([72,4])
-        Q2 = np.zeros([72,4])
-        Q = np.zeros([72,4])
+        numberOfStates = 64
+        Q1 = np.zeros([numberOfStates, env.action_space.n])
+        Q2 = np.zeros([numberOfStates, env.action_space.n])
+        Q = np.zeros([numberOfStates, env.action_space.n])
     # Set learning parameters
         lr = 0.9
         y = 0.95
@@ -247,6 +247,7 @@ class DeepSeaTreasure(gym.Env):
     def get_Action(self,s):
         if np.random.rand() < self.epsilon:
             return env.action_space.sample()
+        self.epsilon = self.epsilon*self.epsilonDecrease
         return np.argmax(s)
 
 
