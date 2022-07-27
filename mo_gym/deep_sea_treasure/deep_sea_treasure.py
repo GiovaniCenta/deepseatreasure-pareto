@@ -2,6 +2,8 @@ from pathlib import Path
 
 import gym
 import numpy as np
+from scipy import rand
+#from sympy import Q
 import pygame
 from gym.spaces import Box, Discrete
 
@@ -51,6 +53,8 @@ class DeepSeaTreasure(gym.Env):
         self.window_size = 512
         self.window = None
         self.clock = None
+        self.epsilon = 0.99
+        self.epsilonDecrease = 0.99
 
         self.float_state = float_state
 
@@ -193,14 +197,71 @@ class DeepSeaTreasure(gym.Env):
             pygame.display.quit()
             pygame.quit()
 
+    #getNonDominated: Return set of non dominated q-values(s,a)
+    def get_NonDominated(self):
+        pass
+
+    def get_QValues(self):
+        
+        reward1 = 0
+        reward2 = 0
+        
+        Q1 = np.zeros([72,4])
+        Q2 = np.zeros([72,4])
+        Q = np.zeros([72,4])
+    # Set learning parameters
+        lr = 0.9
+        y = 0.95
+        num_episodes = 15000
+        paretoList=[]
+        
+        for i in range(num_episodes):
+            
+            env.reset()
+            s=0
+            totalTime=0
+            
+            #Qlearning
+            while totalTime<500:
+                #tem que ver como pega o estado s
+                env.render()
+                a = env.get_Action(s)
+
+                s1, vec_reward, terminal, info = env.step(a)
+                reward1 = vec_reward[0]
+                reward2 = vec_reward[1]
+                
+                Q1[s,a] = Q1[s,a] + lr*(reward1 + y*np.max(Q1[s1,:]) - Q1[s,a])
+                Q2[s,a] = Q2[s,a] + lr*(reward2 + y*np.max(Q2[s1,:]) - Q2[s,a])
+                Q[s,a]= reward1*Q1[s,a] + reward2*Q2[s,a]
+                s = s1
+                #cada linha é um estado e cada coluna é uma ação
+                print("\nQ TABLE = ")
+                print(Q)
+                print("\n\n\n")
+                if terminal:
+                    env.reset()
+                    break
+
+    #TODO (falta adaptar para nossa tabela de q values)
+    def get_Action(self,s):
+        if np.random.rand() < self.epsilon:
+            return env.action_space.sample()
+        return np.argmax(s)
+
+
 
 if __name__ == '__main__':
 
     env = DeepSeaTreasure()
     done = False
     env.reset()
-    while True:
+    """while True:
         env.render()
         obs, r, done, info = env.step(env.action_space.sample())
+        print(r, "REVARDS")
         if done:
             env.reset()
+    """
+    
+    env.get_QValues()
