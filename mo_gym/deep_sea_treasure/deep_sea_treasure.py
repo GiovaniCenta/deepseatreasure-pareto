@@ -55,6 +55,10 @@ class DeepSeaTreasure(gym.Env):
         self.clock = None
         self.epsilon = 0.99
         self.epsilonDecrease = 0.9
+        self.paretoFront=[]
+        self.paretoList = []
+        
+        self.paretoFrontResult = []
 
         self.float_state = float_state
 
@@ -208,19 +212,26 @@ class DeepSeaTreasure(gym.Env):
         numberOfStates = 64
         Q1 = np.zeros([numberOfStates, env.action_space.n])
         Q2 = np.zeros([numberOfStates, env.action_space.n])
-        Q = np.zeros([numberOfStates, env.action_space.n])
+        Qsum = np.zeros([numberOfStates, env.action_space.n])
+        Q =[Q1,Q2]
+        rewardsHistory = np.zeros([numberOfStates, env.action_space.n])
     # Set learning parameters
         lr = 0.9
         y = 0.95
         num_episodes = 15000
         paretoList=[]
+        a=0
         
         for i in range(num_episodes):
             
             env.reset()
             s=0
             totalTime=0
+            self.epsilon = self.epsilon*self.epsilonDecrease
+            print("\n\n\ntrocou de ep\n\n\n")
+
             
+
             #Qlearning
             while totalTime<500:
                 #tem que ver como pega o estado s
@@ -231,24 +242,102 @@ class DeepSeaTreasure(gym.Env):
                 reward1 = vec_reward[0]
                 reward2 = vec_reward[1]
                 
+               
+
+
                 Q1[s,a] = Q1[s,a] + lr*(reward1 + y*np.max(Q1[s1,:]) - Q1[s,a])
+
+                
+                
+                
+                
                 Q2[s,a] = Q2[s,a] + lr*(reward2 + y*np.max(Q2[s1,:]) - Q2[s,a])
-                Q[s,a]= reward1*Q1[s,a] + reward2*Q2[s,a]
+
+                
+                Qsum[s,a]= reward1*Q1[s,a] + reward2*Q2[s,a]
+                
+                print("Q[s,a]")
+                print(Q1[s,a])
+                print("\n")
+                #Qset[0] = Q1[s,a]
+                #Qset[1] = Q2[s,a]
+
+                print("Q[0] depois")
+                print(Q[1])
+                print("\n\n")
+
+
                 s = s1
-                #cada linha é um estado e cada coluna é uma ação
-                print("\nQ TABLE = ")
-                print(Q)
-                print("\n\n\n")
+               
                 if terminal:
                     env.reset()
                     break
+            Q[0] = Q1
+            Q[1] = Q2
+            self.get_NonDominated(0,0,Q1,Q2) 
+           
 
     #TODO (falta adaptar para nossa tabela de q values)
     def get_Action(self,s):
         if np.random.rand() < self.epsilon:
             return env.action_space.sample()
-        self.epsilon = self.epsilon*self.epsilonDecrease
+        
         return np.argmax(s)
+
+    
+   
+    
+    def get_NonDominated(self, rewardsHistory, reward,Q1,Q2):
+        
+        maior=0
+        q_values = [0]
+        maiores = []
+        
+        for q in Q1:
+            print("\n q ")
+            print(q)
+            print("\n")
+            for q_value in q:
+                if (q_value > max(q_values)):
+                    maior = q_value
+                    maiores.append(maior)
+                    
+                q_values.append(q_value)
+                print("\nmaiores")
+                print(maiores)
+                print("\n")
+        print("\n Q1 ")
+        print(Q1)
+        exit(8)        
+
+        
+        self.paretoList.append(Q1)
+        for each in self.paretoList:
+            self.paretoFront.append(each)
+            for e in self.paretoList:
+                print("e:")
+                print(e)
+                print("\n")
+                exit(8)
+                
+                if (e[1]>each[1] and e[0]>=each[0]) or (e[1]>=each[1] and e[0]>each[0]) :
+                    self.paretoFront.remove(each)
+                    self.paretoList.remove(each)
+                    break
+            
+        for each in self.paretoFront:
+            if each not in self.paretoFrontResult:
+                self.paretoFrontResult.append(each)
+        
+
+
+        print(self.paretoFrontResult)
+
+        #meanRewards = meanRewards + ((reward - meanRewards)/ rewardsHistory)
+        return None
+    
+    def get_MeanRewards(self):
+        raise NotImplemented
 
 
 
@@ -266,3 +355,6 @@ if __name__ == '__main__':
     """
     
     env.get_QValues()
+
+
+  
