@@ -1,4 +1,6 @@
+from multiprocessing.resource_sharer import stop
 from pathlib import Path
+from xml.etree.ElementTree import tostring
 
 import gym
 import numpy as np
@@ -193,6 +195,7 @@ class DeepSeaTreasure(gym.Env):
         vec_reward = np.array([treasure_value, time_penalty], dtype=np.float32)
 
         state = self.get_state()
+        print(state)
 
         return state, vec_reward, terminal, {}
 
@@ -201,21 +204,55 @@ class DeepSeaTreasure(gym.Env):
             pygame.display.quit()
             pygame.quit()
 
-    #getNonDominated: Return set of non dominated q-values(s,a)
-    def get_NonDominated(self):
-        pass
+    #Matthieu's implementation
+    def non_Dominated(solutions, return_indexes=False):
+        is_efficient = np.ones(solutions.shape[0], dtype=bool)
+        for i, c in enumerate(solutions):
+            if is_efficient[i]:
+                # Remove dominated points, will also remove itself
+                is_efficient[is_efficient] = np.any(solutions[is_efficient] > c, axis=1)
+                # keep this solution as non-dominated
+                is_efficient[i] = 1
+        if return_indexes:
+            return solutions[is_efficient], is_efficient
+        else:
+            return solutions[is_efficient]
+    
+    # TODO: Currently returning random actions
+    def get_Action(self,s):
+        return env.action_space.sample()
+
+        if np.random.rand() < self.epsilon:
+            return env.action_space.sample()
+        return np.argmax(s)
 
     def get_QValues(self):
-        
+        """
+        s = current state.\n
+        s1 = next state.\n
+        a = action taken.\n
+        vec_reward[2] = 0-Reward for first objetive, 1-Reward for second objective.\n
+        nonDominatedSet = Set of non dominated solutions.\n
+        rewardsHistory1/rewardsHistory2[] = Historic for mean recived reward and total times action a was chosen in that state for each objective.\n
+        """
         reward1 = 0
         reward2 = 0
+        
         numberOfStates = 64
+        
         Q1 = np.zeros([numberOfStates, env.action_space.n])
         Q2 = np.zeros([numberOfStates, env.action_space.n])
         Qsum = np.zeros([numberOfStates, env.action_space.n])
         Q =[Q1,Q2]
-        rewardsHistory = np.zeros([numberOfStates, env.action_space.n])
-    # Set learning parameters
+        
+        nonDominatedSet = []
+
+        #rewardsHistory[States, Actions]:
+        rewardsMean1 = np.zeros((numberOfStates, env.action_space.n)) #Tracks mean rewards for each pair state action
+        rewardsMean2 = np.zeros((numberOfStates, env.action_space.n))
+        actionsCounter = np.zeros((numberOfStates, env.action_space.n)) #Tracks the number of times action 'a' was taken on state 's'
+
+        # Learning parameters
         lr = 0.9
         y = 0.95
         num_episodes = 15000
@@ -223,102 +260,90 @@ class DeepSeaTreasure(gym.Env):
         a=0
         
         for i in range(num_episodes):
-            
+            print("\nStarting episode ", i, ":\n")
+
             env.reset()
             s=0
             totalTime=0
             self.epsilon = self.epsilon*self.epsilonDecrease
-            print("\n\n\ntrocou de ep\n\n\n")
 
-            
-
-            #Qlearning
+            # Qlearning
             while totalTime<500:
-                #tem que ver como pega o estado s
+
                 env.render()
                 a = env.get_Action(s)
-
                 s1, vec_reward, terminal, info = env.step(a)
                 reward1 = vec_reward[0]
                 reward2 = vec_reward[1]
                 
-               
+                # TODO: Algorithm 4 line 8 Van Moffaert & Nowé
+                # nonDominatedSet = self.non_Dominated(solutions?????, false)
 
+                actionsCounter[s, a] += 1 #Add action choice
 
+                # Algorithm 4 line 9 Van Moffaert & Nowé
+                print(rewardsMean1[s,a])
+                rewardsMean1[s][a] = rewardsMean1[s][a] + ((reward1 - rewardsMean1[s][a]) / actionsCounter[s][a])
+                rewardsMean2[s, a] = rewardsMean2[s, a] + ((reward2 - rewardsMean2[s, a]) / actionsCounter[s, a])
+
+                # TODO: Update qSet
                 Q1[s,a] = Q1[s,a] + lr*(reward1 + y*np.max(Q1[s1,:]) - Q1[s,a])
-
-                
-                
-                
-                
                 Q2[s,a] = Q2[s,a] + lr*(reward2 + y*np.max(Q2[s1,:]) - Q2[s,a])
 
-                
                 Qsum[s,a]= reward1*Q1[s,a] + reward2*Q2[s,a]
                 
-                print("Q[s,a]")
-                print(Q1[s,a])
-                print("\n")
+                #print("Q[s,a]")
+                #print(Q1[s,a])
+                #print("\n")
                 #Qset[0] = Q1[s,a]
                 #Qset[1] = Q2[s,a]
 
-                print("Q[0] depois")
-                print(Q[1])
-                print("\n\n")
-
+                #print("Q[0] depois")
+                #print(Q[1])
+                #print("\n\n")
 
                 s = s1
                
                 if terminal:
                     env.reset()
                     break
-            Q[0] = Q1
-            Q[1] = Q2
-            self.get_NonDominated(0,0,Q1,Q2) 
-           
+            #Q[0] = Q1
+            #Q[1] = Q2
+            #self.get_NonDominated(0,0,Q1,Q2)           #(??????)
 
-    #TODO (falta adaptar para nossa tabela de q values)
-    def get_Action(self,s):
-        if np.random.rand() < self.epsilon:
-            return env.action_space.sample()
-        
-        return np.argmax(s)
+    """ #####Scrapped non dominated implementation#####
 
-    
-   
-    
     def get_NonDominated(self, rewardsHistory, reward,Q1,Q2):
-        
         maior=0
         q_values = [0]
         maiores = []
         
         for q in Q1:
-            print("\n q ")
-            print(q)
-            print("\n")
+            #print("\n q ")
+            #print(q)
+            #print("\n")
             for q_value in q:
                 if (q_value > max(q_values)):
                     maior = q_value
                     maiores.append(maior)
                     
                 q_values.append(q_value)
-                print("\nmaiores")
-                print(maiores)
-                print("\n")
-        print("\n Q1 ")
-        print(Q1)
-        exit(8)        
+                #print("\nmaiores")
+                #print(maiores)
+                #print("\n")
+        #print("\n Q1 ")
+        #print(Q1)
+        #exit(8)        
 
         
         self.paretoList.append(Q1)
         for each in self.paretoList:
             self.paretoFront.append(each)
             for e in self.paretoList:
-                print("e:")
-                print(e)
-                print("\n")
-                exit(8)
+                #print("e:")
+                #print(e)
+                #print("\n")
+                #exit(8)
                 
                 if (e[1]>each[1] and e[0]>=each[0]) or (e[1]>=each[1] and e[0]>each[0]) :
                     self.paretoFront.remove(each)
@@ -329,20 +354,15 @@ class DeepSeaTreasure(gym.Env):
             if each not in self.paretoFrontResult:
                 self.paretoFrontResult.append(each)
         
-
-
-        print(self.paretoFrontResult)
-
+        #print(self.paretoFrontResult)
         #meanRewards = meanRewards + ((reward - meanRewards)/ rewardsHistory)
         return None
     
     def get_MeanRewards(self):
         raise NotImplemented
-
-
+    """
 
 if __name__ == '__main__':
-
     env = DeepSeaTreasure()
     done = False
     env.reset()
@@ -353,8 +373,4 @@ if __name__ == '__main__':
         if done:
             env.reset()
     """
-    
     env.get_QValues()
-
-
-  
