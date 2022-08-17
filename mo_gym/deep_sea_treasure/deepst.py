@@ -63,6 +63,8 @@ class DeepSeaTreasure(gym.Env):
         self.paretoFrontResult = []
 
         self.float_state = float_state
+        self.nA = 0
+        
 
         # The map of the deep sea treasure (convex version)
         self.sea_map = dst_map
@@ -164,9 +166,12 @@ class DeepSeaTreasure(gym.Env):
             )
 
     def get_state(self):
+        
         if self.float_state:
             state = self.current_state.astype(np.float32) * 0.1
         else:
+            
+            #state = self.current_state
             state = self.current_state.copy()
         return state
 
@@ -175,9 +180,14 @@ class DeepSeaTreasure(gym.Env):
         self.np_random.seed(seed)
 
         self.current_state = np.array([0, 0], dtype=np.int32)
+        #self.current_state = 0
         self.step_count = 0.0
         state = self.get_state()
+        print("state = ")
+        print(state)
         return (state, {}) if return_info else state
+
+
 
     def step(self, action):
         next_state = self.current_state + self.dir[action]
@@ -204,117 +214,113 @@ class DeepSeaTreasure(gym.Env):
             pygame.display.quit()
             pygame.quit()
 
-    #Matthieu's implementation
-    def non_Dominated(solutions, return_indexes=False):
-        is_efficient = np.ones(solutions.shape[0], dtype=bool)
-        for i, c in enumerate(solutions):
-            if is_efficient[i]:
-                # Remove dominated points, will also remove itself
-                is_efficient[is_efficient] = np.any(solutions[is_efficient] > c, axis=1)
-                # keep this solution as non-dominated
-                is_efficient[i] = 1
-        if return_indexes:
-            return solutions[is_efficient], is_efficient
-        else:
-            return solutions[is_efficient]
-    
-    # TODO: Currently returning random actions
-    def get_Action(self,s):
-        return env.action_space.sample()
 
-        if np.random.rand() < self.epsilon:
-            return env.action_space.sample()
-        return np.argmax(s)
 
-    def get_QValues(self):
-        """
-        s = current state.\n
-        s1 = next state.\n
-        a = action taken.\n
-        vec_reward[2] = 0-Reward for first objetive, 1-Reward for second objective.\n
-        nonDominatedSet = Set of non dominated solutions.\n
-        rewardsHistory1/rewardsHistory2[] = Historic for mean recived reward and total times action a was chosen in that state for each objective.\n
-        """
-        reward1 = 0
-        reward2 = 0
+
+
+class Pareto(DeepSeaTreasure):
+    def __init__(self, env, choose_action, ref_point, nO=2, gamma=1.):
+        self.env = env
+        self.choose_action = choose_action
+        self.gamma = gamma
+
+        self.ref_point = ref_point
+
+        self.nS = 64
         
-        numberOfStates = 64
-        numberOfObjectives = 2
+        self.nA = env.action_space.n
+        env.nA = self.nA
+        self.non_dominated = [[[np.zeros(nO)] for _ in range(self.nA)] for _ in range(self.nS)]
+        self.avg_r = np.zeros((self.nS, self.nA, nO))
+        self.n_visits = np.zeros((self.nS, self.nA))
+        self.epsilon = 1
         
-        Q1 = np.zeros([numberOfStates, env.action_space.n])
-        Q2 = np.zeros([numberOfStates, env.action_space.n])
-        Qsum = np.zeros([numberOfStates, env.action_space.n])
-        Q =[Q1,Q2]
 
-        #initialize non dominated
-        self.non_dominated = [[[np.zeros(numberOfObjectives)] for _ in range(env.nA)] for _ in range(numberOfStates)]
+    def initializeState(self):
+        state = self.env.reset()
         
-        
-        #intialize rewards vectors
-        #rewardsHistory[States, Actions]:
-        rewardsMean1 = np.zeros((numberOfStates, env.action_space.n)) #Tracks mean rewards for each pair state action
-        rewardsMean2 = np.zeros((numberOfStates, env.action_space.n))
-        actionsCounter = np.zeros((numberOfStates, env.action_space.n)) #Tracks the number of times action 'a' was taken on state 's'
+        return {'observation':state,'terminal':False}
 
-        # Learning parameters
-        lr = 0.9
-        y = 0.95
-        num_episodes = 15000
-        paretoList=[]
-        a=0
-        
-        for i in range(num_episodes):
-            print("\nStarting episode ", i, ":\n")
 
-            env.reset()
-            s=0
-            totalTime=0
-            self.epsilon = self.epsilon*self.epsilonDecrease
 
-            # Qlearning
-            while totalTime<500:
-
+    def train(self,max_episodes,max_steps):
+        numberOfEpisodes = 0
+        episodeSteps = 0
+        #line 1 -> initialize q_set
+        print("train")
+        #line 2 -> for each episode
+        while numberOfEpisodes  < max_episodes:
+            
+            #line 3 -> initialize state s
+            s = self.initializeState()
+            
+            #line 4 and 11 -> repeat until s is terminal:
+            print("oi")
+            while s['terminal'] is not True and episodeSteps < max_steps:
                 env.render()
-                q_set = []
-                a = env.get_Action(s)
-                s1, vec_reward, terminal, info = env.step(a)
-                reward1 = vec_reward[0]
-                reward2 = vec_reward[1]
-                actionsCounter[s, a] += 1 #Add action choice
-                # TODO: Algorithm 4 line 8 Van Moffaert & Nowé
-                # nonDominatedSet = self.non_Dominated(solutions?????, false)
-                get_non_dominated()
-               
-
-                # Algorithm 4 line 9 Van Moffaert & Nowé
-                print(rewardsMean1[s,a])
-                rewardsMean1[s][a] = rewardsMean1[s][a] + ((reward1 - rewardsMean1[s][a]) / actionsCounter[s][a])
-                rewardsMean2[s, a] = rewardsMean2[s, a] + ((reward2 - rewardsMean2[s, a]) / actionsCounter[s, a])
-
-                # TODO: Update qSet
-                #Q1[s,a] = Q1[s,a] + lr*(reward1 + y*np.max(Q1[s1,:]) - Q1[s,a])
-                #Q2[s,a] = Q2[s,a] + lr*(reward2 + y*np.max(Q2[s1,:]) - Q2[s,a])
-
-                #Qsum[s,a]= reward1*Q1[s,a] + reward2*Q2[s,a]
+                s = self.step(s)
                 
-                #print("Q[s,a]")
-                #print(Q1[s,a])
-                #print("\n")
-                #Qset[0] = Q1[s,a]
-                #Qset[1] = Q2[s,a]
+                episodeSteps =+1
+            
+            numberOfEpisodes=+1
 
-                #print("Q[0] depois")
-                #print(Q[1])
-                #print("\n\n")
 
-                s = s1
-               
-                if terminal:
-                    env.reset()
-                    break
-            #Q[0] = Q1
-            #Q[1] = Q2
-            #self.get_NonDominated(0,0,Q1,Q2)           #(??????)
+    def step(self,state):
+        s = state['observation']
+
+        #line 5 -> Choose action a from s using a policy derived from the Qˆset’s
+        
+        q_set = self.compute_q_set(s)
+        action = self.choose_action(s, q_set)
+        #line 6 ->Take action a and observe state s0 ∈ S and reward vector r ∈ R
+        next_state, reward, terminal, _ = self.env.step(action)
+        
+        #line 8 -> . Update ND policies of s' in s
+        self.update_non_dominated(s, action, next_state)
+        
+        #line 9 -> Update avg immediate reward
+        self.n_visits[s, action] += 1
+        self.avg_r[s, action] += (reward - self.avg_r[s, action]) / self.n_visits[s, action]
+
+        self.epsilon *= 0.997
+        return {'observation': next_state,
+                'terminal': terminal,
+                'reward': reward}
+
+    
+    def compute_q_set(self, s):
+        q_set = []
+        s=s[0]
+        for a in range(self.env.nA):
+            
+            
+            nd_sa = self.non_dominated[s][a]
+            rew = self.avg_r[s, a]
+            q_set.append([rew + self.gamma*nd for nd in nd_sa])
+        return np.array(q_set)
+
+    def update_non_dominated(self, s, a, s_n):
+        s=s[0]
+        q_set_n = self.compute_q_set(s_n)
+        # update for all actions, flatten
+        solutions = np.concatenate(q_set_n, axis=0)
+        # append to current pareto front
+        # solutions = np.concatenate([solutions, self.non_dominated[s][a]])
+
+        # compute pareto front
+        self.non_dominated[s][a] = get_non_dominated(solutions)
+
+
+
+
+
+def get_action(s, q,env):
+    
+
+    if np.random.rand() < env.epsilon:
+        return env.action_space.sample()
+    return env.action_space.sample()
+
 
 
 def get_non_dominated(solutions):
@@ -327,17 +333,15 @@ def get_non_dominated(solutions):
             is_efficient[i] = 1
 
     return solutions[is_efficient]
-    
+
 
 if __name__ == '__main__':
+    import gym
+    import deep_sea_treasure
+    from gym import wrappers
+
     env = DeepSeaTreasure()
-    done = False
-    env.reset()
-    """while True:
-        env.render()
-        obs, r, done, info = env.step(env.action_space.sample())
-        print(r, "REVARDS")
-        if done:
-            env.reset()
-    """
-    env.get_QValues()
+    ref_point = np.array([0, -25])
+    agent = Pareto(env, lambda s, q: get_action(s, q,env), ref_point, nO=2, gamma=1.)
+    #print("oi aqui")
+    agent.train(1000,1000)
