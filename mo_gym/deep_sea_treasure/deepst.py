@@ -8,6 +8,7 @@ from scipy import rand
 #from sympy import Q
 import pygame
 from gym.spaces import Box, Discrete
+from pygmo import hypervolume
 
 
 # As in Yang et al. (2019):
@@ -64,6 +65,8 @@ class DeepSeaTreasure(gym.Env):
 
         self.float_state = float_state
         self.nA = 0
+
+        self.stateList = []
         
 
         # The map of the deep sea treasure (convex version)
@@ -87,8 +90,10 @@ class DeepSeaTreasure(gym.Env):
 
         self.current_state = np.array([0, 0], dtype=np.int32)
 
+
     def get_map_value(self, pos):
         return self.sea_map[pos[0]][pos[1]]
+
 
     def is_valid_state(self, state):
         if state[0] >= 0 and state[0] <= 10 and state[1] >= 0 and state[1] <= 10:
@@ -96,6 +101,7 @@ class DeepSeaTreasure(gym.Env):
                 return True
         return False
     
+
     def render(self, mode='human'):
         # The size of a single grid square in pixels
         pix_square_size = self.window_size / self.size
@@ -165,15 +171,15 @@ class DeepSeaTreasure(gym.Env):
                 np.array(pygame.surfarray.pixels3d(canvas)), axes=(1, 0, 2)
             )
 
+
     def get_state(self):
+        s = ''.join(str(self.current_state))
+
+        if s not in self.stateList:
+            self.stateList.append(s)
         
-        if self.float_state:
-            state = self.current_state.astype(np.float32) * 0.1
-        else:
-            
-            #state = self.current_state
-            state = self.current_state.copy()
-        return state
+        return self.stateList.index(s)
+
 
     def reset(self, seed=None, return_info=False, **kwargs):
         super().reset(seed=seed)
@@ -183,10 +189,8 @@ class DeepSeaTreasure(gym.Env):
         #self.current_state = 0
         self.step_count = 0.0
         state = self.get_state()
-        print("state = ")
-        print(state)
-        return (state, {}) if return_info else state
 
+        return (state, {}) if return_info else state
 
 
     def step(self, action):
@@ -205,17 +209,14 @@ class DeepSeaTreasure(gym.Env):
         vec_reward = np.array([treasure_value, time_penalty], dtype=np.float32)
 
         state = self.get_state()
-        print(state)
 
         return state, vec_reward, terminal, {}
+
 
     def close(self):
         if self.window is not None:
             pygame.display.quit()
             pygame.quit()
-
-
-
 
 
 class Pareto(DeepSeaTreasure):
@@ -233,7 +234,7 @@ class Pareto(DeepSeaTreasure):
         self.non_dominated = [[[np.zeros(nO)] for _ in range(self.nA)] for _ in range(self.nS)]
         self.avg_r = np.zeros((self.nS, self.nA, nO))
         self.n_visits = np.zeros((self.nS, self.nA))
-        self.epsilon = 1
+        self.epsilon = 0
         
 
     def initializeState(self):
@@ -242,12 +243,11 @@ class Pareto(DeepSeaTreasure):
         return {'observation':state,'terminal':False}
 
 
-
     def train(self,max_episodes,max_steps):
         numberOfEpisodes = 0
         episodeSteps = 0
         #line 1 -> initialize q_set
-        print("train")
+        print("-> Training started <-")
         #line 2 -> for each episode
         while numberOfEpisodes  < max_episodes:
             
@@ -255,7 +255,6 @@ class Pareto(DeepSeaTreasure):
             s = self.initializeState()
             
             #line 4 and 11 -> repeat until s is terminal:
-            print("oi")
             while s['terminal'] is not True and episodeSteps < max_steps:
                 env.render()
                 s = self.step(s)
@@ -280,9 +279,11 @@ class Pareto(DeepSeaTreasure):
         
         #line 9 -> Update avg immediate reward
         self.n_visits[s, action] += 1
+
         self.avg_r[s, action] += (reward - self.avg_r[s, action]) / self.n_visits[s, action]
 
-        self.epsilon *= 0.997
+        env.epsilon *= 0.999
+
         return {'observation': next_state,
                 'terminal': terminal,
                 'reward': reward}
@@ -290,17 +291,14 @@ class Pareto(DeepSeaTreasure):
     
     def compute_q_set(self, s):
         q_set = []
-        s=s[0]
         for a in range(self.env.nA):
-            
-            
             nd_sa = self.non_dominated[s][a]
             rew = self.avg_r[s, a]
             q_set.append([rew + self.gamma*nd for nd in nd_sa])
         return np.array(q_set)
 
+
     def update_non_dominated(self, s, a, s_n):
-        s=s[0]
         q_set_n = self.compute_q_set(s_n)
         # update for all actions, flatten
         solutions = np.concatenate(q_set_n, axis=0)
@@ -311,16 +309,25 @@ class Pareto(DeepSeaTreasure):
         self.non_dominated[s][a] = get_non_dominated(solutions)
 
 
-
-
-
 def get_action(s, q,env):
-    
+    q_values = compute_hypervolume(q, q.shape[0], ref_point)
 
-    if np.random.rand() < env.epsilon:
+    if np.random.rand() >= env.epsilon:
+        return np.random.choice(np.argwhere(q_values == np.amax(q_values)).flatten())
+    else:
         return env.action_space.sample()
-    return env.action_space.sample()
 
+
+def compute_hypervolume(q_set, nA, ref):
+    q_values = np.zeros(nA)
+    for i in range(nA):
+        # pygmo uses hv minimization,
+        # negate rewards to get costs
+        points = np.array(q_set[i]) * -1.
+        hv = hypervolume(points)
+        # use negative ref-point for minimization
+        q_values[i] = hv.compute(ref*-1)
+    return q_values
 
 
 def get_non_dominated(solutions):
@@ -342,6 +349,6 @@ if __name__ == '__main__':
 
     env = DeepSeaTreasure()
     ref_point = np.array([0, -25])
-    agent = Pareto(env, lambda s, q: get_action(s, q,env), ref_point, nO=2, gamma=1.)
+    agent = Pareto(env, lambda s, q: get_action(s, q, env), ref_point, nO=2, gamma=1.)
     #print("oi aqui")
     agent.train(1000,1000)
