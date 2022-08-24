@@ -9,7 +9,9 @@ from scipy import rand
 import pygame
 from gym.spaces import Box, Discrete
 from pygmo import hypervolume
+from metrics import metrics as mtc
 
+metrics = mtc([], [], [])
 
 # As in Yang et al. (2019):
 DEFAULT_MAP = np.array(
@@ -218,7 +220,6 @@ class DeepSeaTreasure(gym.Env):
             pygame.display.quit()
             pygame.quit()
 
-
 class Pareto(DeepSeaTreasure):
     def __init__(self, env, choose_action, ref_point, nO=2, gamma=1.):
         self.env = env
@@ -246,22 +247,32 @@ class Pareto(DeepSeaTreasure):
     def train(self,max_episodes,max_steps):
         numberOfEpisodes = 0
         episodeSteps = 0
+
         #line 1 -> initialize q_set
         print("-> Training started <-")
         #line 2 -> for each episode
         while numberOfEpisodes  < max_episodes:
-            
+
+            acumulatedRewards = [0,0]
+            episodeSteps = 0
+
             #line 3 -> initialize state s
             s = self.initializeState()
             
             #line 4 and 11 -> repeat until s is terminal:
             while s['terminal'] is not True and episodeSteps < max_steps:
-                env.render()
+                #env.render()
                 s = self.step(s)
-                
-                episodeSteps =+1
-            
-            numberOfEpisodes=+1
+                print(s, episodeSteps)
+                episodeSteps += 1
+                acumulatedRewards[0] += s['reward'][0]
+                acumulatedRewards[1] += s['reward'][1]
+
+            metrics.rewards1.append(acumulatedRewards[0])
+            metrics.rewards2.append(acumulatedRewards[1])
+            metrics.episodes.append(numberOfEpisodes)
+            numberOfEpisodes+=1
+            print(numberOfEpisodes)
 
 
     def step(self,state):
@@ -308,7 +319,6 @@ class Pareto(DeepSeaTreasure):
         # compute pareto front
         self.non_dominated[s][a] = get_non_dominated(solutions)
 
-
 def get_action(s, q,env):
     q_values = compute_hypervolume(q, q.shape[0], ref_point)
 
@@ -316,7 +326,6 @@ def get_action(s, q,env):
         return np.random.choice(np.argwhere(q_values == np.amax(q_values)).flatten())
     else:
         return env.action_space.sample()
-
 
 def compute_hypervolume(q_set, nA, ref):
     q_values = np.zeros(nA)
@@ -329,7 +338,6 @@ def compute_hypervolume(q_set, nA, ref):
         q_values[i] = hv.compute(ref*-1)
     return q_values
 
-
 def get_non_dominated(solutions):
     is_efficient = np.ones(solutions.shape[0], dtype=bool)
     for i, c in enumerate(solutions):
@@ -341,7 +349,6 @@ def get_non_dominated(solutions):
 
     return solutions[is_efficient]
 
-
 if __name__ == '__main__':
     import gym
     import deep_sea_treasure
@@ -351,4 +358,5 @@ if __name__ == '__main__':
     ref_point = np.array([0, -25])
     agent = Pareto(env, lambda s, q: get_action(s, q, env), ref_point, nO=2, gamma=1.)
     #print("oi aqui")
-    agent.train(1000,1000)
+    agent.train(1000,200)
+    metrics.plotGraph()
