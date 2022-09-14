@@ -2,6 +2,7 @@ from multiprocessing.resource_sharer import stop
 from pathlib import Path
 from xml.etree.ElementTree import tostring
 
+import copy
 import gym
 import numpy as np
 from scipy import rand
@@ -10,7 +11,6 @@ import pygame
 from gym.spaces import Box, Discrete
 from pygmo import hypervolume
 from metrics import metrics as mtc
-import copy
 
 metrics = mtc([], [], [])
 
@@ -57,7 +57,7 @@ class DeepSeaTreasure(gym.Env):
         self.window_size = 512
         self.window = None
         self.clock = None
-        self.epsilon = 0.7
+        self.epsilon = 1
         self.epsilonDecrease = 0.99
         self.paretoFront=[]
         self.paretoList = []
@@ -234,14 +234,10 @@ class Pareto(DeepSeaTreasure):
         self.non_dominated = [[[np.zeros(nO)] for _ in range(self.nA)] for _ in range(self.nS)]
         self.avg_r = np.zeros((self.nS, self.nA, nO))
         self.n_visits = np.zeros((self.nS, self.nA))
-        
-        self.ndPoint = []
-        self.numberOfEpisodes=0
-        
-        self.qcopy = 0
-        self.polIndex = 0
+        #self.epsilon = 0
+
         self.polDict = {}
-        self.polLog = open("polLog.csv","w")
+        self.polIndex = 0
         
 
     def initializeState(self):
@@ -257,10 +253,10 @@ class Pareto(DeepSeaTreasure):
         #line 1 -> initialize q_set
         print("-> Training started <-")
         #line 2 -> for each episode
-        while self.numberOfEpisodes  < max_episodes:
+        while numberOfEpisodes  < max_episodes:
 
             acumulatedRewards = [0,0]
-            
+            episodeSteps = 0
 
             #line 3 -> initialize state s
             s = self.initializeState()
@@ -276,14 +272,11 @@ class Pareto(DeepSeaTreasure):
 
             metrics.rewards1.append(acumulatedRewards[0])
             metrics.rewards2.append(acumulatedRewards[1])
-            metrics.episodes.append(self.numberOfEpisodes)
-            
-            #if self.numberOfEpisodes == 0:
-            #    metrics.pdict = self.polDict
-            self.numberOfEpisodes+=1
-        #metrics.plot_pareto_frontier2(self.polDict)
+            metrics.episodes.append(numberOfEpisodes)
+            numberOfEpisodes+=1
+            #print(numberOfEpisodes)
+        
         metrics.plot_pareto_frontier2(self.polDict)
-            
 
 
     def step(self,state):
@@ -292,16 +285,15 @@ class Pareto(DeepSeaTreasure):
         #line 5 -> Choose action a from s using a policy derived from the Qˆset’s
         
         q_set = self.compute_q_set(s)
+        action = self.choose_action(s, q_set)
         self.qcopy = copy.deepcopy(q_set)
         self.polDict[self.polIndex] = self.qcopy
         self.polIndex +=1
-        action = self.choose_action(s, q_set)
-
         #line 6 ->Take action a and observe state s0 ∈ S and reward vector r ∈ R
         next_state, reward, terminal, _ = self.env.step(action)
         
         #line 8 -> . Update ND policies of s' in s
-        metrics.ndPoints.append(self.update_non_dominated(s, action, next_state))
+        self.update_non_dominated(s, action, next_state)
         
         #line 9 -> Update avg immediate reward
         self.n_visits[s, action] += 1
@@ -309,22 +301,7 @@ class Pareto(DeepSeaTreasure):
         self.avg_r[s, action] += (reward - self.avg_r[s, action]) / self.n_visits[s, action]
 
         env.epsilon *= 0.999
-       
-        
-        
-        
-        #deep copy da politica atual e guardar dentro de um dicionario de politicas com index do passo atual
 
-        #print(self.polDict)
-        """
-        print("\n\n politica: ")
-        print(str(self.polDict[self.polIndex]) + ':' + str(self.polIndex))
-        print("\n\n")
-        """
-        #self.polLog.write(str(self.qcopy) + ':' +  str(self.polIndex) + ',\n' )
-        
-        
-        #pegar a politica de cada step e simular e guardar os valores para plotar o gráfico depois
         return {'observation': next_state,
                 'terminal': terminal,
                 'reward': reward}
@@ -344,11 +321,10 @@ class Pareto(DeepSeaTreasure):
         # update for all actions, flatten
         solutions = np.concatenate(q_set_n, axis=0)
         # append to current pareto front
-        #solutions = np.concatenate([solutions, self.non_dominated[s][a]])
+        # solutions = np.concatenate([solutions, self.non_dominated[s][a]])
 
         # compute pareto front
         self.non_dominated[s][a] = get_non_dominated(solutions)
-        return self.non_dominated[s][a]
 
 def get_action(s, q,env):
     q_values = compute_hypervolume(q, q.shape[0], ref_point)
@@ -386,7 +362,6 @@ if __name__ == '__main__':
 
     env = DeepSeaTreasure()
     ref_point = np.array([0, -25])
-    agent = Pareto(env, lambda s, q: get_action(s, q, env), ref_point, nO=2, gamma=1.)
-    #print("oi aqui")
+    agent = Pareto(env, lambda s, q: get_action(s, q, env), ref_point, nO=2, gamma=1)
     agent.train(1000,200)
     metrics.plotGraph()
