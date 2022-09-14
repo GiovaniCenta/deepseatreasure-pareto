@@ -2,7 +2,6 @@ from multiprocessing.resource_sharer import stop
 from pathlib import Path
 from xml.etree.ElementTree import tostring
 
-import copy
 import gym
 import numpy as np
 from scipy import rand
@@ -57,11 +56,11 @@ class DeepSeaTreasure(gym.Env):
         self.window_size = 512
         self.window = None
         self.clock = None
-        self.epsilon = 1
-        self.epsilonDecrease = 0.99
+        self.epsilon = 0.99
+        self.epsilonDecrease = 0.9
         self.paretoFront=[]
         self.paretoList = []
-         
+        
         self.paretoFrontResult = []
 
         self.float_state = float_state
@@ -234,10 +233,7 @@ class Pareto(DeepSeaTreasure):
         self.non_dominated = [[[np.zeros(nO)] for _ in range(self.nA)] for _ in range(self.nS)]
         self.avg_r = np.zeros((self.nS, self.nA, nO))
         self.n_visits = np.zeros((self.nS, self.nA))
-        #self.epsilon = 0
-
-        self.polDict = {}
-        self.polIndex = 0
+        self.epsilon = 0
         
 
     def initializeState(self):
@@ -265,7 +261,7 @@ class Pareto(DeepSeaTreasure):
             while s['terminal'] is not True and episodeSteps < max_steps:
                 #env.render()
                 s = self.step(s)
-                #print(s, episodeSteps)
+                print(s, episodeSteps)
                 episodeSteps += 1
                 acumulatedRewards[0] += s['reward'][0]
                 acumulatedRewards[1] += s['reward'][1]
@@ -274,9 +270,8 @@ class Pareto(DeepSeaTreasure):
             metrics.rewards2.append(acumulatedRewards[1])
             metrics.episodes.append(numberOfEpisodes)
             numberOfEpisodes+=1
-            #print(numberOfEpisodes)
-        
-        metrics.plot_pareto_frontier2(self.polDict)
+            print(numberOfEpisodes)
+            metrics.plot_pareto_frontier2(self.polDict)
 
 
     def step(self,state):
@@ -362,6 +357,7 @@ if __name__ == '__main__':
 
     env = DeepSeaTreasure()
     ref_point = np.array([0, -25])
-    agent = Pareto(env, lambda s, q: get_action(s, q, env), ref_point, nO=2, gamma=1)
+    agent = Pareto(env, lambda s, q: get_action(s, q, env), ref_point, nO=2, gamma=1.)
+    #print("oi aqui")
     agent.train(1000,200)
     metrics.plotGraph()

@@ -63,7 +63,8 @@ class metrics():
         plt.plot(pf_X, pf_Y)
         plt.xlabel("Treasure Reward for Action " + str(actionIndex) )
         plt.ylabel("Time Penalty for Action " + str(actionIndex))
-        plt.show()    
+        plt.show()     
+        
         
 
     def plot_p_front2(self,x,y,indexAction):
