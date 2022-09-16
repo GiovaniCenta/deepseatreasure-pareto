@@ -11,6 +11,7 @@ import pygame
 from gym.spaces import Box, Discrete
 from pygmo import hypervolume
 from metrics import metrics as mtc
+from agent import Pareto
 
 metrics = mtc([], [], [])
 
@@ -58,14 +59,9 @@ class DeepSeaTreasure(gym.Env):
         self.window = None
         self.clock = None
         self.epsilon = 1
-        self.epsilonDecrease = 0.99
-        self.paretoFront=[]
-        self.paretoList = []
-         
-        self.paretoFrontResult = []
 
         self.float_state = float_state
-        self.nA = 0
+        
 
         self.stateList = []
         
@@ -219,149 +215,5 @@ class DeepSeaTreasure(gym.Env):
             pygame.display.quit()
             pygame.quit()
 
-class Pareto(DeepSeaTreasure):
-    def __init__(self, env, choose_action, ref_point, nO=2, gamma=1.):
-        self.env = env
-        self.choose_action = choose_action
-        self.gamma = gamma
-
-        self.ref_point = ref_point
-
-        self.nS = 64
-        
-        self.nA = env.action_space.n
-        env.nA = self.nA
-        self.non_dominated = [[[np.zeros(nO)] for _ in range(self.nA)] for _ in range(self.nS)]
-        self.avg_r = np.zeros((self.nS, self.nA, nO))
-        self.n_visits = np.zeros((self.nS, self.nA))
-        #self.epsilon = 0
-
-        self.polDict = {}
-        self.polIndex = 0
-        
-
-    def initializeState(self):
-        state = self.env.reset()
-        
-        return {'observation':state,'terminal':False}
 
 
-    def train(self,max_episodes,max_steps):
-        numberOfEpisodes = 0
-        episodeSteps = 0
-
-        #line 1 -> initialize q_set
-        print("-> Training started <-")
-        #line 2 -> for each episode
-        while numberOfEpisodes  < max_episodes:
-
-            acumulatedRewards = [0,0]
-            episodeSteps = 0
-
-            #line 3 -> initialize state s
-            s = self.initializeState()
-            
-            #line 4 and 11 -> repeat until s is terminal:
-            while s['terminal'] is not True and episodeSteps < max_steps:
-                #env.render()
-                s = self.step(s)
-                #print(s, episodeSteps)
-                episodeSteps += 1
-                acumulatedRewards[0] += s['reward'][0]
-                acumulatedRewards[1] += s['reward'][1]
-
-            metrics.rewards1.append(acumulatedRewards[0])
-            metrics.rewards2.append(acumulatedRewards[1])
-            metrics.episodes.append(numberOfEpisodes)
-            numberOfEpisodes+=1
-            #print(numberOfEpisodes)
-        
-        metrics.plot_pareto_frontier2(self.polDict)
-
-
-    def step(self,state):
-        s = state['observation']
-
-        #line 5 -> Choose action a from s using a policy derived from the Qˆset’s
-        
-        q_set = self.compute_q_set(s)
-        action = self.choose_action(s, q_set)
-        self.qcopy = copy.deepcopy(q_set)
-        self.polDict[self.polIndex] = self.qcopy
-        self.polIndex +=1
-        #line 6 ->Take action a and observe state s0 ∈ S and reward vector r ∈ R
-        next_state, reward, terminal, _ = self.env.step(action)
-        
-        #line 8 -> . Update ND policies of s' in s
-        self.update_non_dominated(s, action, next_state)
-        
-        #line 9 -> Update avg immediate reward
-        self.n_visits[s, action] += 1
-
-        self.avg_r[s, action] += (reward - self.avg_r[s, action]) / self.n_visits[s, action]
-
-        env.epsilon *= 0.999
-
-        return {'observation': next_state,
-                'terminal': terminal,
-                'reward': reward}
-
-    
-    def compute_q_set(self, s):
-        q_set = []
-        for a in range(self.env.nA):
-            nd_sa = self.non_dominated[s][a]
-            rew = self.avg_r[s, a]
-            q_set.append([rew + self.gamma*nd for nd in nd_sa])
-        return np.array(q_set)
-
-
-    def update_non_dominated(self, s, a, s_n):
-        q_set_n = self.compute_q_set(s_n)
-        # update for all actions, flatten
-        solutions = np.concatenate(q_set_n, axis=0)
-        # append to current pareto front
-        # solutions = np.concatenate([solutions, self.non_dominated[s][a]])
-
-        # compute pareto front
-        self.non_dominated[s][a] = get_non_dominated(solutions)
-
-def get_action(s, q,env):
-    q_values = compute_hypervolume(q, q.shape[0], ref_point)
-
-    if np.random.rand() >= env.epsilon:
-        return np.random.choice(np.argwhere(q_values == np.amax(q_values)).flatten())
-    else:
-        return env.action_space.sample()
-
-def compute_hypervolume(q_set, nA, ref):
-    q_values = np.zeros(nA)
-    for i in range(nA):
-        # pygmo uses hv minimization,
-        # negate rewards to get costs
-        points = np.array(q_set[i]) * -1.
-        hv = hypervolume(points)
-        # use negative ref-point for minimization
-        q_values[i] = hv.compute(ref*-1)
-    return q_values
-
-def get_non_dominated(solutions):
-    is_efficient = np.ones(solutions.shape[0], dtype=bool)
-    for i, c in enumerate(solutions):
-        if is_efficient[i]:
-            # Remove dominated points, will also remove itself
-            is_efficient[is_efficient] = np.any(solutions[is_efficient] > c, axis=1)
-            # keep this solution as non-dominated
-            is_efficient[i] = 1
-
-    return solutions[is_efficient]
-
-if __name__ == '__main__':
-    import gym
-    from gym import wrappers
-
-    env = DeepSeaTreasure()
-    ref_point = np.array([0, -25])
-    agent = Pareto(env, lambda s, q: get_action(s, q, env), ref_point, nO=2, gamma=1)
-    agent.train(1000,200)
-    metrics.plotGraph()

@@ -72,7 +72,7 @@ class metrics():
     # Find lowest values for cost and highest for savings
         p_front = self.pareto_frontier(Xs, Ys, maxX = True, maxY = True) 
         # Plot a scatter graph of all results
-        plt.scatter(Xs, Ys)
+        #plt.scatter(Xs, Ys)
         # Then plot the Pareto frontier on top
         plt.plot(p_front[0], p_front[1])
         plt.show()
@@ -100,7 +100,7 @@ class metrics():
                 if pair[1] >= p_front[-1][1]: # Look for higher values of Y…
                     best.append(pair[1])
                     if pair[1] in best:
-                        print(max(best))
+                        #print(max(best))
                         p_front.append(pair)
                      # … and add them to the Pareto frontier
                     
@@ -116,9 +116,9 @@ class metrics():
 
 
         
-    def plot_pareto_frontier2(self,poldict, maxX=True, maxY=True):
+    def plot_pareto_frontier2(self):
         '''Pareto frontier selection process'''
-        self.pdict = poldict
+        
         #print(self.pdict)
         i = 0
 
@@ -142,10 +142,10 @@ class metrics():
             self.yA3.append(v[3][0][1])
         
         #print(xA0)
-        self.plot_p_front2(self.xA0,self.yA0,0)
-        self.plot_p_front2(self.xA1,self.yA1,1)
-        self.plot_p_front2(self.xA2,self.yA2,2)
-        self.plot_p_front2(self.xA3,self.yA3,3)
+        self.plot_p_front(self.xA0,self.yA0,0)
+        self.plot_p_front(self.xA1,self.yA1,1)
+        self.plot_p_front(self.xA2,self.yA2,2)
+        self.plot_p_front(self.xA3,self.yA3,3)
         
         
     
