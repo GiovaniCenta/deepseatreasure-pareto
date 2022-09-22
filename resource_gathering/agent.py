@@ -57,8 +57,6 @@ class Pareto():
 
             #line 3 -> initialize state s
             s = self.initializeState()
-            #print(s)
-            
             
             #line 4 and 11 -> repeat until s is terminal:
             while s['terminal'] is not True and episodeSteps < max_steps:
@@ -80,8 +78,6 @@ class Pareto():
 
     def step(self,state):
         s = state['observation']
-        
-        
 
         #line 5 -> Choose action a from s using a policy derived from the Qˆset’s
         
@@ -98,8 +94,7 @@ class Pareto():
         next_state, reward, terminal, _ = self.env.step(action)
         
         #line 8 -> . Update ND policies of s' in s
-        nd = self.update_non_dominated(s, action, next_state)
-        metrics.ndPoints.append(nd)
+        self.update_non_dominated(s, action, next_state)
         
         #line 9 -> Update avg immediate reward
         self.n_visits[s, action] += 1
@@ -129,7 +124,6 @@ class Pareto():
 
         # compute pareto front
         self.non_dominated[s][a] = self.actionsMethods.get_non_dominated(solutions)
-        return self.non_dominated[s][a]
 
 class actionMethods():
     def __init__(self,epsilon,epsilonDecrease):
@@ -190,4 +184,4 @@ if __name__ == '__main__':
 
     #metrics
     metrics.plotGraph()
-    metrics.plot_pareto_frontier()
+    metrics.plot_pareto_frontier2()

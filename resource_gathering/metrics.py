@@ -33,65 +33,90 @@ class metrics():
     
     def plot_p_front(self,Xs,Ys,actionIndex,maxY = True,maxX = True):
         
-        
+         
         sorted_list = sorted([[Xs[i], Ys[i]] for i in range(len(Xs))], reverse=maxX)
         pareto_front = [sorted_list[0]]
         for pair in sorted_list[1:]:
             if maxY:
-               
+                best = []
                 if pair[1] >= pareto_front[-1][1]:
+                    #print(pair[1])
+                    """
+                    backup = pair[1]
+                    best.append(backup)
+                    exist_count = pareto_front.count(backup)
+                    print(exist_count)
                     
+                    if exist_count > 0:
+                        print("entrou aqui")
+                        """
+
                     pareto_front.append(pair)
             else:
                 if pair[1] <= pareto_front[-1][1]:
                     pareto_front.append(pair)
-       
         
-       
-       
-       
-        pf_X = []
-        pf_Y = []
-        best_y = [] 
-        best_x = []
-        for pair in pareto_front:
-            
-            
-            if pair[1] not in pf_Y:
-                best_y.append((pair[0],pair[1]))
-                pf_Y.append(pair[1])
-            else:
-                pf_Y.append(pair[1])
-
-            if pair[0] not in pf_X:
-                best_x.append((pair[0],pair[1]))
-                pf_X.append(pair[0])
-            else:
-                pf_X.append(pair[0])
-            
-        
-
-        print(best_y)
-        print(best_x)
-        frontier = []
-        for p in best_x:
-            if p in best_y:
-                frontier.append(p)     
-            
-        pf_X = [pair[0] for pair in frontier]
-        pf_Y = [pair[1] for pair in frontier]    
+        '''Plotting process'''
         plt.scatter(Xs,Ys)
+        pf_X = [pair[0] for pair in pareto_front]
+        pf_Y = [pair[1] for pair in pareto_front]
         plt.plot(pf_X, pf_Y)
         plt.xlabel("Treasure Reward for Action " + str(actionIndex) )
         plt.ylabel("Time Penalty for Action " + str(actionIndex))
+        plt.show()     
+        
+        
+
+    def plot_p_front2(self,x,y,indexAction):
+        Xs, Ys = x,y
+    # Find lowest values for cost and highest for savings
+        p_front = self.pareto_frontier(Xs, Ys, maxX = True, maxY = True) 
+        # Plot a scatter graph of all results
+        #plt.scatter(Xs, Ys)
+        # Then plot the Pareto frontier on top
+        plt.plot(p_front[0], p_front[1])
         plt.show()
-           
+        """
+        fig, ax = plt.subplots()
+        ax.plot(x,y,'ro')
         
+        #plt.scatter(x,y)
+        ax.set_title('Pareto Frontier')
+        plt.xlabel("Treasure value")
+        plt.ylabel("Time penalty")
+        
+        plt.show()
+        """
 
+    def pareto_frontier(self,Xs, Ys, maxX = True, maxY = True):
+# Sort the list in either ascending or descending order of X
+        myList = sorted([[Xs[i], Ys[i]] for i in range(len(Xs))], reverse=maxX)
+    # Start the Pareto frontier with the first value in the sorted list
+        p_front = [myList[0]]    
+    # Loop through the sorted list
+        for pair in myList[1:]:
+            best =[]
+            if maxY: 
+                if pair[1] >= p_front[-1][1]: # Look for higher values of Y…
+                    best.append(pair[1])
+                    if pair[1] in best:
+                        #print(max(best))
+                        p_front.append(pair)
+                     # … and add them to the Pareto frontier
+                    
+                    
+            else:
+                if pair[1] <= p_front[-1][1]: # Look for lower values of Y…
+                    p_front.append(pair) # … and add them to the Pareto frontier
+    # Turn resulting pairs back into a list of Xs and Ys
+        #exit(8)
+        p_frontX = [pair[0] for pair in p_front]
+        p_frontY = [pair[1] for pair in p_front]
+        return p_frontX, p_frontY
 
 
         
-    def plot_pareto_frontier(self):
+    def plot_pareto_frontier2(self):
         '''Pareto frontier selection process'''
         
         #print(self.pdict)

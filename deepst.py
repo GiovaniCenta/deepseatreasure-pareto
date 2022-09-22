@@ -170,10 +170,12 @@ class DeepSeaTreasure(gym.Env):
 
 
     def get_state(self):
+        
         s = ''.join(str(self.current_state))
 
         if s not in self.stateList:
             self.stateList.append(s)
+        
         
         return self.stateList.index(s)
 
