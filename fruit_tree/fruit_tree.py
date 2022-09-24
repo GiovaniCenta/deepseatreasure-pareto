@@ -261,6 +261,7 @@ class FruitTreeEnv(gym.Env):
 
         self.current_state = np.array([0, 0], dtype=np.int32)
         self.terminal = False
+        self.stateList = []
 
     def get_ind(self, pos):
         return int(2 ** pos[0] - 1) + pos[1]
@@ -270,11 +271,12 @@ class FruitTreeEnv(gym.Env):
 
     def reset(self, seed=None, return_info=False, **kwargs):
         super().reset(seed=seed)
-        self.np_random.seed(seed)
+        #self.np_random.seed(seed)
 
         self.current_state = np.array([0, 0], dtype=np.int32)
         self.terminal = False
-        return (self.current_state.copy(), {}) if return_info else self.current_state.copy()
+        state = self.get_state()
+        return (state, {}) if return_info else state
 
     def step(self, action):
         direction = {
@@ -287,5 +289,17 @@ class FruitTreeEnv(gym.Env):
         reward = self.get_tree_value(self.current_state)
         if self.current_state[0] == self.tree_depth:
             self.terminal = True
+        
+        state = self.get_state()
 
-        return self.current_state.copy(), reward, self.terminal, {}
+        return state, reward, self.terminal, {}
+
+    def get_state(self):
+        
+        s = ''.join(str(self.current_state))
+
+        if s not in self.stateList:
+            self.stateList.append(s)
+        
+        
+        return self.stateList.index(s)
