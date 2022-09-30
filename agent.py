@@ -32,6 +32,7 @@ class Pareto():
         self.n_visits = np.zeros((self.nS, self.nA))
         self.epsilon = 1
         self.epsilonDecrease = 0.99
+        self.stateList = []
 
         self.polDict = {}
         self.polIndex = 0
@@ -39,8 +40,16 @@ class Pareto():
 
     def initializeState(self):
         state = self.env.reset()
+        s = ''.join(str(state))
+        if s not in self.stateList:
+            self.stateList.append(s)
+        s = self.stateList.index(s)
         
-        return {'observation':state,'terminal':False}
+        
+        
+
+        
+        return {'observation':s,'terminal':False}
 
 
     def train(self,max_episodes,max_steps):
@@ -73,7 +82,7 @@ class Pareto():
             metrics.rewards2.append(acumulatedRewards[1])
             metrics.episodes.append(numberOfEpisodes)
             numberOfEpisodes+=1
-            #print(numberOfEpisodes)
+            print(numberOfEpisodes)
         
         metrics.pdict = self.polDict
 
@@ -96,10 +105,14 @@ class Pareto():
 
         #line 6 ->Take action a and observe state s0 ∈ S and reward vector r ∈ R
         next_state, reward, terminal, _ = self.env.step(action)
+        next_s = ''.join(str(next_state))
         
-        #line 8 -> . Update ND policies of s' in s
-        nd = self.update_non_dominated(s, action, next_state)
-        metrics.ndPoints.append(nd)
+        if next_s not in self.stateList:
+            self.stateList.append(next_s)
+        
+        next_s = self.stateList.index(next_s)
+        nd = self.update_non_dominated(s, action, next_s)
+        
         
         #line 9 -> Update avg immediate reward
         self.n_visits[s, action] += 1
@@ -108,7 +121,7 @@ class Pareto():
 
         self.actionsMethods.epsilon *= self.actionsMethods.epsilonDecrease
 
-        return {'observation': next_state,
+        return {'observation': next_s,
                 'terminal': terminal,
                 'reward': reward}
 
@@ -191,3 +204,5 @@ if __name__ == '__main__':
     #metrics
     metrics.plotGraph()
     metrics.plot_pareto_frontier()
+
+    print("-> Done <-")

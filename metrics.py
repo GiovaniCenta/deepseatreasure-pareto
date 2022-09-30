@@ -2,6 +2,8 @@ from msilib.schema import Class
 from queue import Empty
 from re import X
 import matplotlib.pyplot as plt
+import datetime
+import os
 
 class metrics():
     def __init__(self, episodes, rewards1, rewards2):
@@ -19,16 +21,33 @@ class metrics():
         self.yA2 = []
         self.xA3 = []
         self.yA3 = []
+        self.count = 0
+        self.path = ''
+        self.createLogDir()
+
+    def createLogDir(self):
+        e = datetime.datetime.now()
+        directory = e.strftime("%d#%m#%Y  %H-%M-%S")
+        self.path = os.path.join(os.getcwd() + '\\log','log '+ directory)
+        
+        if not os.path.exists(self.path):
+            os.mkdir(self.path)
 
     def plotGraph(self):
         
         
         fig, ax = plt.subplots()
         ax.plot(self.episodes, self.rewards1)
-        ax.set_title('Rewards 1 x Episodes')
+        ax.set_title('Treasure reward x Episodes')
+        #plt.show()
+        plt.savefig(self.path + '\\Treasure reward x Episodes')
+        
         fig, ax2 = plt.subplots()
         ax2.plot(self.episodes, self.rewards2)
-        ax2.set_title('Rewards 2 x Episodes')
+        ax2.set_title('Time penalty x Episodes')
+        
+        
+        plt.savefig(self.path + '\\Time penalty x Episodes')
         plt.show()
     
     def plot_p_front(self,Xs,Ys,actionIndex,maxY = True,maxX = True):
@@ -84,6 +103,8 @@ class metrics():
         plt.plot(pf_X, pf_Y)
         plt.xlabel("Treasure Reward for Action " + str(actionIndex) )
         plt.ylabel("Time Penalty for Action " + str(actionIndex))
+        plt.savefig(self.path + '//Pareto front - ' + "Treasure Reward" + ' x ' + " Time Penalty " + " for action " + str(actionIndex))    
+
         plt.show()
            
         

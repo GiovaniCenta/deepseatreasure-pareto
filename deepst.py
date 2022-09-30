@@ -187,9 +187,9 @@ class DeepSeaTreasure(gym.Env):
         self.current_state = np.array([0, 0], dtype=np.int32)
         #self.current_state = 0
         self.step_count = 0.0
-        state = self.get_state()
+        
 
-        return (state, {}) if return_info else state
+        return (self.current_state, {}) if return_info else self.current_state
 
 
     def step(self, action):
@@ -207,9 +207,9 @@ class DeepSeaTreasure(gym.Env):
         time_penalty = -1.0
         vec_reward = np.array([treasure_value, time_penalty], dtype=np.float32)
 
-        state = self.get_state()
+        #state = self.get_state()
 
-        return state, vec_reward, terminal, {}
+        return self.current_state, vec_reward, terminal, {}
 
 
     def close(self):
